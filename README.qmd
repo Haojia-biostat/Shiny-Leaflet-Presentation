@@ -1,0 +1,14 @@
+---
+title: "Intro to Shiny and Leaflet "
+author: "Haojia Li"
+format: 
+  gfm: default
+date: "`r Sys.Date()`"
+---
+
+Resources:
+
+* [Leaflet for R](https://rstudio.github.io/leaflet/)
+* [Shiny Gallery](https://shiny.rstudio.com/gallery/)
+* [Shiny Learning Resources](https://shiny.rstudio.com/tutorial/)
+* [shinyWidgets](https://shinyapps.dreamrs.fr/shinyWidgets/)
