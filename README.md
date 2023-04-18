@@ -1,0 +1,108 @@
+Data visualization: representative station of weather by Leaflet and
+Shiny
+================
+Haojia Li
+4/18/23
+
+This project adopts the practice in Part 3, [Lab
+3](https://uofuepibio.github.io/PHS7045-advanced-programming/week-03-lab.html).
+We are going to use the met data and the station data to locate the most
+representative USAF station at either country level or state level by
+identifying the station with the smallest euclidean distance.
+
+# Part 1. Static visualization using Leaflet
+
+[Leaflet](https://leafletjs.com/) is one of the most popular open-source
+JavaScript libraries for interactive maps. The
+[`leaflet`](https://rstudio.github.io/leaflet/) package makes it easy to
+integrate and control Leaflet maps in R.
+
+I will introduce the following features of leaflet as I show my results
+of the visualization:
+
+1.  data object - Both `leaflet()` and the map layer functions have an
+    optional data parameter that is designed to receive spatial data in
+    one of several forms. We will only focus on data frame with lng/lat
+    columns from base R;
+
+2.  basemaps - Default tiles by `addTiles()` and third-party tiles by
+    `addProviderTiles()` and calling `providers`;
+
+3.  map methods - `setView()`; `fitBounds()` will be used in the Shiny
+    app;
+
+4.  add elements
+
+- Use `addMarkers` to add markers to the map for the 5 most
+  representative stations in the United States in terms of wind speed,
+  temperature, dew point, atmosphere pressure, and relative humidity;
+
+- Use the `popup` argument to add pop up the relevant information upon
+  click, such as:
+
+  USAFID: 724016 Name: CHARLOTTESVILLE ALBEMARLE ARPT Number of records:
+  1027 Wind speed: 1.5 km/h Temperature: 23.3℃ Dew point: 18.9℃
+  Atmospheric pressure: 1014.9 hPa Relative humidity: 76.6% Distance
+  score: 1.3
+
+- Use `addCircles` add circles to the map for the top 10 or top 10%
+  representative stations in each state in terms of all the weather
+  conditions, using circle size to visualize the number of records and
+  color to visualize the euclidean distance, and use `addLegend` to add
+  color legend for the distance score;
+
+- Use the `group` argument and `addLayersControl` to add layers to the
+  map for each weather conditions, so that the user can access not only
+  the representative stations of all weather conditions but also those
+  being representative in regards to a single condition within only one
+  leaflet output.
+
+If time permits, I will also add how to add plots as popup and how to
+save leaflet as image to this part.
+
+# Part 2. Dynamic visualization using Leaflet with Shiny
+
+Thinking about the following problems:
+
+1.  The static leaflet is interactive, however limited. The developer
+    need to have all the results computed locally.
+
+2.  We only included 6 layers in the static leaflet. However, given that
+    there are 5 weather conditions, theoretically we can have up to
+    $2^5-1$ combinations of potential interest.
+
+3.  The user might want to adjust the number of representative to be
+    identified.
+
+4.  We visualized global weather condition of each station, state and
+    the United States in August, but we might interested in how the
+    weather, then the representative station(s), changed in the 31 days
+    of the month. We might also interested in the weather during a
+    certain period of the day, for example in the morning from 8 am to
+    12 pm.
+
+All above are the motivations for a [Shiny](https://shiny.rstudio.com/)
+app, which makes it easy to build interactive web apps straight from R.
+
+I am going to start with a brief introduction of the structure of a
+Shiny app - ui and server. I will also add some useful links, such as
+[Shiny Gallery](https://shiny.rstudio.com/gallery/), [Shiny Learning
+Resources](https://shiny.rstudio.com/tutorial/) and
+[shinyWidgets](https://shinyapps.dreamrs.fr/shinyWidgets/) for
+reference.
+
+To add flexibility and dynamic to the analysis, my Shiny app with
+include:
+
+1.  `checkboxGroupButtons` for the weather conditions;
+
+2.  `numericInput`s for number and percentage of representative, at
+    country level or state level;
+
+3.  `sliderInput` for hours from 0 to 23, so that the user can specify
+    the time interval of interest;
+
+4.  `sliderInput` for day, with animation control.
+
+If time permits, I will add a new tab panel to include `plotly` and
+`DT::datatable`.

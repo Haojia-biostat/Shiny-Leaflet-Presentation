@@ -1,145 +1,72 @@
 ---
-title: "Intro to Shiny and Leaflet "
+title: "Data visualization: representative station of weather by Leaflet and Shiny"
 author: "Haojia Li"
+format: 
+  gfm: default
 date: "`r Sys.Date()`"
-format: html
 ---
 
-Resources:
+This project adopts the practice in Part 3, [Lab 3](https://uofuepibio.github.io/PHS7045-advanced-programming/week-03-lab.html).
+We are going to use the met data and the station data to locate the most representative USAF station at either country level or state level by identifying the station with the smallest euclidean distance.
 
-* [Leaflet for R](https://rstudio.github.io/leaflet/)
-* [Shiny Gallery](https://shiny.rstudio.com/gallery/)
-* [Shiny Learning Resources](https://shiny.rstudio.com/tutorial/)
-* [shinyWidgets](https://shinyapps.dreamrs.fr/shinyWidgets/)
+# Part 1. Static visualization using Leaflet
 
-# Prepare data
+[Leaflet](https://leafletjs.com/) is one of the most popular open-source JavaScript libraries for interactive maps. The [`leaflet`](https://rstudio.github.io/leaflet/) package makes it easy to integrate and control Leaflet maps in R.
 
-```{r load met and station}
-library(data.table)
-# ---- met data ----
-met <- fread("https://raw.githubusercontent.com/USCbiostats/data-science-data/master/02_met/met_all.gz")
+I will introduce the following features of leaflet as I show my results of the visualization:
 
-# select columns
-met <- met[, .(USAFID, day, hour, wind.sp, temp, dew.point, atm.press, rh)]
+1. data object - Both `leaflet()` and the map layer functions have an optional data parameter that is designed to receive spatial data in one of several forms. We will only focus on data frame with lng/lat columns from base R;
 
-# ---- station data ----
-stations <- fread("ftp://ftp.ncdc.noaa.gov/pub/data/noaa/isd-history.csv")
+2. basemaps - Default tiles by `addTiles()` and third-party tiles by `addProviderTiles()` and calling `providers`;
 
-# filter stations in US and select relevant columns
-stations <- stations[CTRY == "US", .(USAF, `STATION NAME`, STATE, LAT, LON)]
+3. map methods - `setView()`; `fitBounds()` will be used in the Shiny app;
 
-# drop NAs (999999) in USAF
-stations[, USAF := as.integer(USAF)]
-stations[, USAF := fifelse(USAF == 999999, NA_integer_, USAF)]
-stations <- stations[!is.na(USAF)]
+4. add elements
 
-# deal with NAs in STATE
-stations[, STATE := fifelse(STATE == "", NA_character_, STATE)]
+- Use `addMarkers` to add markers to the map for the 5 most representative stations in the United States in terms of wind speed, temperature, dew point, atmosphere pressure, and relative humidity;
 
-# keep only one data point for each USAF
-stations[, n := 1:.N, by = .(USAF)]
-stations <- stations[n == 1,][, n := NULL]
+- Use the `popup` argument to add pop up the relevant information upon click, such as:
 
-# ---- merge data ----
-met <- merge(met, stations, by.x = "USAFID", by.y = "USAF", all.x = T)
-```
+    USAFID: 724016
+    Name: CHARLOTTESVILLE ALBEMARLE ARPT
+    Number of records: 1027
+    Wind speed: 1.5 km/h
+    Temperature: 23.3℃
+    Dew point: 18.9℃
+    Atmospheric pressure: 1014.9 hPa
+    Relative humidity: 76.6%
+    Distance score: 1.3
 
-Calculate median values of weather conditions at station, state and country level.
+- Use `addCircles` add circles to the map for the top 10 or top 10% representative stations in each state in terms of all the weather conditions, using circle size to visualize the number of records and color to visualize the euclidean distance, and use `addLegend` to add color legend for the distance score;
 
-```{r}
-weathers <- c("wind.sp", "temp", "dew.point", "atm.press", "rh")
+- Use the `group` argument and `addLayersControl` to add layers to the map for each weather conditions, so that the user can access not only the representative stations of all weather conditions but also those being representative in regards to a single condition within only one leaflet output.
 
-# median value of weathers at station level
-met_station <- met[, lapply(.SD, median, na.rm = T), by = .(USAFID, STATE, LON, LAT), .SDcols = weathers]
+If time permits, I will also add how to add plots as popup and how to save leaflet as image to this part.
 
-# median value of weathers at state level
-met_state <- met[, lapply(.SD, median, na.rm = T), by = STATE, .SDcols = weathers]
-# merge state-level median values
-met_station <- merge(met_station, met_state, by = "STATE", suffixes = c(".station", ".state"))
+# Part 2. Dynamic visualization using Leaflet with Shiny
 
-# median value of weathers at country level
-met_us <- met[, lapply(.SD, median, na.rm = T), .SDcols = weathers]
-# add suffix
-colnames(met_us) <- paste0(colnames(met_us), ".us")
-# merge country-level median values
-met_station <- cbind(met_station, met_us)
+Thinking about the following problems:
 
-knitr::kable(met_station) |>
-  kableExtra::kable_styling() |>
-  kableExtra::scroll_box(width = "100%", height = "300px")
-```
+1. The static leaflet is interactive, however limited. The developer need to have all the results computed locally.
 
-Write a function to identify the top representative station(s), at either state or country level, in terms of user-specified weather condition(s) by euclidean distance.
+2. We only included 6 layers in the static leaflet. However, given that there are 5 weather conditions, theoretically we can have up to $2^5-1$ combinations of potential interest.
 
-```{r}
-sta_represent <- function(
-    weathers, # weather conditions of interest
-    top_n = 1, # number of representative stations
-    top_perc = 10, # upper limit of percentage for representatives
-    level = c("state", "us") # at which level to identify representatives
-) {
-  level <- match.arg(level)
-  
-  weather_dist <- sqrt(rowSums(
-    (as.matrix(met_station[, paste0(weathers, ".", "station"), with = F]) - 
-       as.matrix(met_station[, paste0(weathers, ".", level), with = F])) ^ 2,
-  na.rm = T))
-  
-  if(level == "state")
-    res <- met_station[order(-weather_dist), head(.SD, min(top_n, ceiling(.N * top_perc/100))), by = "STATE"]
-  if(level == "us")
-    res <- met_station[order(-weather_dist), head(.SD, min(top_n, ceiling(.N * top_perc/100)))]
-  
-  return(res)
-}
+3. The user might want to adjust the number of representative to be identified.
 
-sta_represent(c("wind.sp", "temp", "atm.press"))
-```
+4. We visualized global weather condition of each station, state and the United States in August, but we might interested in how the weather, then the representative station(s), changed in the 31 days of the month. We might also interested in the weather during a certain period of the day, for example in the morning from 8 am to 12 pm.
 
-# Leaflet
+All above are the motivations for a [Shiny](https://shiny.rstudio.com/) app, which makes it easy to build interactive web apps straight from R.
 
-Load [`leaflet`](https://rstudio.github.io/leaflet/) package.
+I am going to start with a brief introduction of the structure of a Shiny app - ui and server. I will also add some useful links, such as [Shiny Gallery](https://shiny.rstudio.com/gallery/), [Shiny Learning Resources](https://shiny.rstudio.com/tutorial/) and [shinyWidgets](https://shinyapps.dreamrs.fr/shinyWidgets/) for reference.
 
-```{r}
-if(!require("leaflet", quietly = TRUE)) 
-  install.packages("leaflet")
-library(leaflet)
-```
+To add flexibility and dynamic to the analysis, my Shiny app with include:
 
-Data
+1. `checkboxGroupButtons` for the weather conditions;
 
-From base R:
+2. `numericInput`s for number and percentage of representative, at country level or state level;
 
-- lng/lat matrix
-- data frame with lng/lat columns
+3. `sliderInput` for hours from 0 to 23, so that the user can specify the time interval of interest;
 
-From the sp package:
-- SpatialPoints[DataFrame]
-- Line/Lines
-- SpatialLines[DataFrame]
-- Polygon/Polygons
-- SpatialPolygons[DataFrame]
+4. `sliderInput` for day, with animation control.
 
-From the maps package:
-- the data frame from returned from map()
-
-```{r}
-leaflet(met_station)
-```
-
-```{r}
-leaflet() |> addTiles()
-```
-
-There are `r length(providers)` [leaflet providers](https://leaflet-extras.github.io/leaflet-providers/preview/)
-
-```{r}
-leaflet() |> addProviderTiles("CartoDB.Positron")
-```
-
-
-```{r}
-
-
-```
-
+If time permits, I will add a new tab panel to include `plotly` and `DT::datatable`.
