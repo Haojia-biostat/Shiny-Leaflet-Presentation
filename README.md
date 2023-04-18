@@ -40,10 +40,15 @@ of the visualization:
 - Use the `popup` argument to add pop up the relevant information upon
   click, such as:
 
-  USAFID: 724016 Name: CHARLOTTESVILLE ALBEMARLE ARPT Number of records:
-  1027 Wind speed: 1.5 km/h Temperature: 23.3℃ Dew point: 18.9℃
-  Atmospheric pressure: 1014.9 hPa Relative humidity: 76.6% Distance
-  score: 1.3
+  USAFID: 724016  
+  Name: CHARLOTTESVILLE ALBEMARLE ARPT  
+  Number of records: 1027  
+  Wind speed: 1.5 km/h  
+  Temperature: 23.3℃  
+  Dew point: 18.9℃  
+  Atmospheric pressure: 1014.9 hPa  
+  Relative humidity: 76.6%  
+  Distance score: 1.3
 
 - Use `addCircles` add circles to the map for the top 10 or top 10%
   representative stations in each state in terms of all the weather
@@ -88,7 +93,7 @@ I am going to start with a brief introduction of the structure of a
 Shiny app - ui and server. I will also add some useful links, such as
 [Shiny Gallery](https://shiny.rstudio.com/gallery/), [Shiny Learning
 Resources](https://shiny.rstudio.com/tutorial/) and
-[shinyWidgets](https://shinyapps.dreamrs.fr/shinyWidgets/) for
+[shinyWidgets](https://shinyapps.dreamrs.fr/shinyWidgets/), for
 reference.
 
 To add flexibility and dynamic to the analysis, my Shiny app with
