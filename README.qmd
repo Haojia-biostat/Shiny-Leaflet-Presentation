@@ -1,9 +1,8 @@
 ---
 title: "Intro to Shiny and Leaflet "
 author: "Haojia Li"
-format: 
-  gfm: default
 date: "`r Sys.Date()`"
+format: html
 ---
 
 Resources:
@@ -12,3 +11,135 @@ Resources:
 * [Shiny Gallery](https://shiny.rstudio.com/gallery/)
 * [Shiny Learning Resources](https://shiny.rstudio.com/tutorial/)
 * [shinyWidgets](https://shinyapps.dreamrs.fr/shinyWidgets/)
+
+# Prepare data
+
+```{r load met and station}
+library(data.table)
+# ---- met data ----
+met <- fread("https://raw.githubusercontent.com/USCbiostats/data-science-data/master/02_met/met_all.gz")
+
+# select columns
+met <- met[, .(USAFID, day, hour, wind.sp, temp, dew.point, atm.press, rh)]
+
+# ---- station data ----
+stations <- fread("ftp://ftp.ncdc.noaa.gov/pub/data/noaa/isd-history.csv")
+
+# filter stations in US and select relevant columns
+stations <- stations[CTRY == "US", .(USAF, `STATION NAME`, STATE, LAT, LON)]
+
+# drop NAs (999999) in USAF
+stations[, USAF := as.integer(USAF)]
+stations[, USAF := fifelse(USAF == 999999, NA_integer_, USAF)]
+stations <- stations[!is.na(USAF)]
+
+# deal with NAs in STATE
+stations[, STATE := fifelse(STATE == "", NA_character_, STATE)]
+
+# keep only one data point for each USAF
+stations[, n := 1:.N, by = .(USAF)]
+stations <- stations[n == 1,][, n := NULL]
+
+# ---- merge data ----
+met <- merge(met, stations, by.x = "USAFID", by.y = "USAF", all.x = T)
+```
+
+Calculate median values of weather conditions at station, state and country level.
+
+```{r}
+weathers <- c("wind.sp", "temp", "dew.point", "atm.press", "rh")
+
+# median value of weathers at station level
+met_station <- met[, lapply(.SD, median, na.rm = T), by = .(USAFID, STATE, LON, LAT), .SDcols = weathers]
+
+# median value of weathers at state level
+met_state <- met[, lapply(.SD, median, na.rm = T), by = STATE, .SDcols = weathers]
+# merge state-level median values
+met_station <- merge(met_station, met_state, by = "STATE", suffixes = c(".station", ".state"))
+
+# median value of weathers at country level
+met_us <- met[, lapply(.SD, median, na.rm = T), .SDcols = weathers]
+# add suffix
+colnames(met_us) <- paste0(colnames(met_us), ".us")
+# merge country-level median values
+met_station <- cbind(met_station, met_us)
+
+knitr::kable(met_station) |>
+  kableExtra::kable_styling() |>
+  kableExtra::scroll_box(width = "100%", height = "300px")
+```
+
+Write a function to identify the top representative station(s), at either state or country level, in terms of user-specified weather condition(s) by euclidean distance.
+
+```{r}
+sta_represent <- function(
+    weathers, # weather conditions of interest
+    top_n = 1, # number of representative stations
+    top_perc = 10, # upper limit of percentage for representatives
+    level = c("state", "us") # at which level to identify representatives
+) {
+  level <- match.arg(level)
+  
+  weather_dist <- sqrt(rowSums(
+    (as.matrix(met_station[, paste0(weathers, ".", "station"), with = F]) - 
+       as.matrix(met_station[, paste0(weathers, ".", level), with = F])) ^ 2,
+  na.rm = T))
+  
+  if(level == "state")
+    res <- met_station[order(-weather_dist), head(.SD, min(top_n, ceiling(.N * top_perc/100))), by = "STATE"]
+  if(level == "us")
+    res <- met_station[order(-weather_dist), head(.SD, min(top_n, ceiling(.N * top_perc/100)))]
+  
+  return(res)
+}
+
+sta_represent(c("wind.sp", "temp", "atm.press"))
+```
+
+# Leaflet
+
+Load [`leaflet`](https://rstudio.github.io/leaflet/) package.
+
+```{r}
+if(!require("leaflet", quietly = TRUE)) 
+  install.packages("leaflet")
+library(leaflet)
+```
+
+Data
+
+From base R:
+
+- lng/lat matrix
+- data frame with lng/lat columns
+
+From the sp package:
+- SpatialPoints[DataFrame]
+- Line/Lines
+- SpatialLines[DataFrame]
+- Polygon/Polygons
+- SpatialPolygons[DataFrame]
+
+From the maps package:
+- the data frame from returned from map()
+
+```{r}
+leaflet(met_station)
+```
+
+```{r}
+leaflet() |> addTiles()
+```
+
+There are `r length(providers)` [leaflet providers](https://leaflet-extras.github.io/leaflet-providers/preview/)
+
+```{r}
+leaflet() |> addProviderTiles("CartoDB.Positron")
+```
+
+
+```{r}
+
+
+```
+
