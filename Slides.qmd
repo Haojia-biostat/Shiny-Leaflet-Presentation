@@ -356,7 +356,94 @@ m
 
 # Shiny: Web Application Framework for R
 
+## 0. Motivations
 
+::: {style="font-size: 20pt"}
 
+Think about the following problems:
 
+1. The static leaflet is interactive, however limited. The developer need to have all the results computed locally.
 
+2. We only included 6 layers in the static leaflet. However, given that there are 5 weather conditions, 
+theoretically we can have up to $2^5-1$ combinations of potential interest.
+
+3. The user might want to adjust the number of representatives to be identified.
+
+4. We visualized global weather condition of each station, state and the United States in August 2019, 
+but we might be interested in how the weather, then the representative station(s), changed in the 31 days of the month. 
+
+5. We might also interested in the weather during a certain period of the day, for example from 8 am to 12 pm in the morning.
+
+6. ...
+
+:::
+
+## 1. Intro to Shiny
+
+::: {style="font-size: 20pt"}
+
+[Shiny](https://shiny.rstudio.com/) is an R package that makes it easy to build interactive web apps straight from R. 
+You can host standalone apps on a webpage or embed them in R Markdown documents or build 
+[dashboards](http://rstudio.github.io/shinydashboard/?_gl=1*fbrgev*_ga*MTUzMjIwMDA3OC4xNjY0OTg1MjEz*_ga_8QJS108GF1*MTY4MjAxMjkxOC4xMy4xLjE2ODIwMTMwMjEuMC4wLjA.*_ga_2C0WZ1JHG0*MTY4MjAxMjkxOC4xMy4xLjE2ODIwMTMxMDMuMC4wLjA.). 
+You can also extend your Shiny apps with [CSS themes](http://rstudio.github.io/shinythemes/?_gl=1*btbeqj*_ga*MTUzMjIwMDA3OC4xNjY0OTg1MjEz*_ga_8QJS108GF1*MTY4MjAxMjkxOC4xMy4xLjE2ODIwMTMwMjEuMC4wLjA.*_ga_2C0WZ1JHG0*MTY4MjAxMjkxOC4xMy4xLjE2ODIwMTMxMDMuMC4wLjA.), 
+[htmlwidgets](http://www.htmlwidgets.org/), 
+and JavaScript [actions](https://github.com/daattali/shinyjs/blob/master/README.md).
+
+```{r}
+# load shiny
+if(!require("shiny", quietly = TRUE)) install.packages("shiny")
+library(shiny)
+```
+
+You can find a myriad of Shiny apps to be inspired by and to learn from
+[Shiny Gallery](https://shiny.rstudio.com/gallery/).
+
+[rstudio](https://github.com/rstudio) also has the [shiny-examples](https://github.com/rstudio/shiny-examples) repository on github 
+including 188 examples.
+
+```{r, eval=FALSE}
+runGitHub("shiny-examples", "rstudio", subdir = "001-hello")
+```
+
+You can also try  `runExample()` to launch Shiny example applications.
+
+```{r, eval=FALSE}
+runExample("02_text")
+```
+
+:::
+
+## 2. Structure of a Shiny App
+
+::: {style="font-size: 20pt"}
+
+Shiny apps are contained in a single script called `app.R`. 
+The script `app.R` lives in a directory (for example, `newdir/`) and the app can be run with `runApp("newdir")`.
+
+`app.R` has four components:
+
+```{r, eval=FALSE}
+# start with loading the `shiny` package;
+library(shiny)
+# a user interface object
+ui <- ...
+# a server function
+server <- function(input, output, ...) {
+  ...
+}
+# a call to the shinyApp function
+shinyApp(ui = ui, server = server)
+```
+
+The user interface (`ui`) object controls the layout and appearance of your app. 
+The `server` function contains the instructions that your computer needs to build your app. 
+Finally the `shinyApp` function creates Shiny app objects from an explicit UI/server pair.
+
+Once you open the `app.R` script in your RStudio editor, 
+RStudio will recognize the Shiny script and provide a Run App button (at the top of the editor). 
+Either click this button to launch your app or use the keyboard shortcut: 
+Command+Shift+Enter on Mac / Control+Shift+Enter on Windows.
+
+:::
+
+# Thanks!
