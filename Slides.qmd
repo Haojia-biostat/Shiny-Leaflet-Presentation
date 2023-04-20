@@ -273,6 +273,87 @@ m |> setView(lng = -111.8272, lat = 40.7648, zoom = 17)
 
 :::
 
+## 4. `addMarkers()`
+
+::: {style="font-size: 20pt"}
+
+Let's start with considering all the weather conditions at country level.
+
+```{r, out.width="100%", out.height="400px"}
+# identify the top 5 or top 10% representative stations for all the weather conditions in the US
+all_us5 <- sta_represent(weathers = weathers_var, top_n = 5, level = "us")
+m <- m |> addMarkers(
+    data = all_us5, 
+    lng = ~LON, lat = ~LAT, popup = ~text,
+    group = "All"
+  )
+m
+```
+
+:::
+
+## 4. `addCircles()`
+
+::: {style="font-size: 20pt"}
+
+Next, add circles of which the size show the number of observations and the color show the distance score 
+for the top 10 or 10% representative stations in each state.
+
+```{r, out.width="100%", out.height="400px"}
+# identify the 10 most representative stations for all the weather conditions
+all_state10 <- sta_represent(weathers = weathers_var, top_n = 10)
+
+# set color palette
+library(RColorBrewer)
+dist.pal <- colorNumeric(palette = "YlGnBu", domain = c(0,10))
+
+m <- m |>
+  addCircles(
+    data = all_state10, 
+    lng = ~LON, lat = ~LAT, popup = ~text,
+    weight = 1, radius = ~N*100, fillOpacity = 0.8, color = ~dist.pal(weather_dist), 
+    group = "All"
+  ) |>
+  addLegend(
+    position = "bottomleft", 
+    pal = dist.pal, values = c(0, 10), opacity = 1, 
+    title = "Distance score"
+  )
+m
+```
+
+:::
+
+## 4. `addLayersControl()`
+
+::: {style="font-size: 20pt"}
+
+Lastly, for each individual weather condition, add top 3 in the US, and top 1 in each state.
+
+```{r, out.width="100%", out.height="400px"}
+each_us3_list <- lapply(weathers_var, sta_represent, top_n = 3, level = "us")
+each_state1_list <- lapply(weathers_var, sta_represent)
+for(i in 1:length(weathers_var)) {
+  m <- m |>
+    addMarkers(
+      data = each_us3_list[[i]], lng = ~LON, lat = ~LAT, popup = ~text, 
+      group = weathers_label[i]
+    ) |>
+    addCircles(
+      data = each_state1_list[[i]], lng = ~LON, lat = ~LAT, popup = ~text, 
+      weight = 1, radius = ~N*100, fillOpacity = 0.8, color = ~dist.pal(weather_dist), 
+      group = weathers_label[i]
+    )
+}  
+m <- m |>
+  addLayersControl(
+    baseGroups = c("All", weathers_label), position = "bottomright", options = layersControlOptions(collapsed = F)
+  )
+m
+```
+
+:::
+
 # Shiny: Web Application Framework for R
 
 
