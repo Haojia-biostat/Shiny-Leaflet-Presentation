@@ -18,6 +18,8 @@ slides_eval <- TRUE
 
 ## Kick off
 
+![](spongebob-squarepants.jpg)
+
 ::: {style="font-size: 20pt"}
 
 To wrap our heads around things, let's start by diving into the 
@@ -410,6 +412,8 @@ You can also try  `runExample()` to launch Shiny example applications.
 runExample("02_text")
 ```
 
+Shiny also provides good resources of [tutorial](https://shiny.rstudio.com/tutorial/) for developers at different levels.
+
 :::
 
 ## 2. Structure of a Shiny App
@@ -546,6 +550,191 @@ fluidRow(
   ))
 )
 ```
+
+:::
+
+## 5. Display reactive output
+
+::: {style="font-size: 20pt"}
+
+Add the basemaps to `output$map` first. `renderLeaflet()` renders the Leaflet map widget. 
+
+If an R object is built by codes calling one or more widget values, the object will be reactive. 
+
+By using `reactive()` function, we wrap a normal expression to create a reactive expression, making the result change over time.
+
+```{r, eval=FALSE}
+server <- function(input, output) {
+  basemap <- reactive(
+    # not yet reactive in this step
+    leaflet() |>
+      addProviderTiles("CartoDB.Positron") |>
+      fitBounds(-123.4, 18.4, -66.1, 47.8)
+  )
+  output$map <- renderLeaflet({basemap()})
+}
+```
+
+:::
+
+## 6. Use reactive expressions - data
+
+::: {style="font-size: 20pt"}
+
+First, we need to update the station level data based on the `input$` changes.
+
+```{r, eval=FALSE}
+station_data <- reactive({
+  # ensure that the values needed are available
+  req(input$weathers, input$hours, input$day)
+  
+  w <- weathers_var[match(input$weathers, weathers_label)]
+  
+  met1 <- met[hour %between% input$hours & day == input$day, ]
+  # number of records and median value of weathers at station level
+  met_station <- met1[, c(.N, lapply(.SD, median, na.rm = T)), by = .(USAFID, STATE, `STATION NAME`, LON, LAT), 
+                      .SDcols = w]
+  
+  # median value of weathers at state level
+  met_state <- met1[, lapply(.SD, median, na.rm = T), by = STATE, .SDcols = w]
+  # merge state-level median values
+  met_station <- merge(met_station, met_state, by = "STATE", suffixes = c(".station", ".state"))
+  
+  # median value of weathers at country level
+  met_us <- met1[, lapply(.SD, median, na.rm = T), .SDcols = w]
+  # add suffix
+  colnames(met_us) <- paste0(colnames(met_us), ".us")
+  # merge country-level median values
+  met_station <- cbind(met_station, met_us)
+  
+})
+```
+
+:::
+
+## 6. Use reactive expressions - data (cont'd)
+
+::: {style="font-size: 20pt"}
+
+Second, aggregate data to country and state level. 
+
+We use `station_data()` instead of `station_data` because it is a reactive object.
+
+```{r, eval=FALSE}
+us_data <- reactive({
+  req(station_data(), input$weathers, input$us_n, input$us_perc)
+  
+  w <- weathers_var[match(input$weathers, weathers_label)]
+  
+  res <- copy(station_data())
+  res$weather_dist <- sqrt(rowSums(
+    (as.matrix(res[, paste0(w, ".", "station"), with = F]) -
+       as.matrix(res[, paste0(w, ".", "us"), with = F])) ^ 2,
+  ))
+  
+  res <- res[order(weather_dist),
+             head(.SD, min(input$us_n, ceiling(.N * input$us_perc/100)))]
+  
+  res <- res[!is.na(weather_dist), ]
+})
+
+state_data <- reactive({
+  req(station_data(), input$weathers, input$state_n, input$state_perc)
+  
+  w <- weathers_var[match(input$weathers, weathers_label)]
+  
+  res <- copy(station_data())
+  res$weather_dist <- sqrt(rowSums(
+    (as.matrix(res[, paste0(w, ".", "station"), with = F]) -
+       as.matrix(res[, paste0(w, ".", "state"), with = F])) ^ 2,
+  ))
+  
+  res <- res[order(weather_dist),
+             head(.SD, min(input$state_n, ceiling(.N * input$state_perc/100))),
+             by = STATE]
+  
+  res <- res[!is.na(weather_dist), ]
+})
+
+```
+
+:::
+
+## 6. Use reactive expressions - basemap and legend
+
+::: {style="font-size: 20pt"}
+
+Create a color palette for the fill color of circles. 
+
+The argument `domian = ` in `colorBin()` and `values = ` in `addLegend()` are used to define possible values that can be mapped.
+
+```{r, eval=FALSE}
+colorPalette <- reactive({
+  colorBin(palette = "YlOrBr", domain = state_data()$weather_dist, bins = seq(0,12,2))
+})
+
+basemap <- reactive(
+  leaflet() |>
+    addProviderTiles("CartoDB.Positron") |>
+    fitBounds(-123.4, 18.4, -66.1, 47.8) |>
+    addLegend("bottomleft", pal = colorPalette(), values = state_data()$weather_dist, title = "Distance score")
+)
+
+output$map <- renderLeaflet({basemap()})
+```
+
+:::
+
+## 6. Use reactive expressions - event handler
+
+::: {style="font-size: 20pt"}
+
+Once there is any change in the `input`, the Leaflet map should update accordingly.
+
+We use `observeEvent()` here, however, shiny recommends using `bindEvent()` since version 1.6.0.
+
+```{r, eval=FALSE}
+observeEvent(
+  us_data(),
+  leafletProxy("map") |>
+    clearMarkers() |>
+    addMarkers(
+      data = us_data(), lng = ~LON, lat = ~LAT,
+    ) |>
+    addCircles(
+      data = state_data(), lng = ~LON, lat = ~LAT,
+      weight = 1, radius = ~N*1000,
+      fillOpacity = 0.8, color = "#AC162C", fillColor = ~colorPalette()(weather_dist),
+    )
+)
+observeEvent(
+  state_data(),
+  leafletProxy("map") |>
+    clearMarkers() |>
+    addMarkers(
+      data = us_data(), lng = ~LON, lat = ~LAT,
+    ) |>
+    addCircles(
+      data = state_data(), lng = ~LON, lat = ~LAT,
+      weight = 1, radius = ~N*1000,
+      fillOpacity = 0.8, color = "#AC162C", fillColor = ~colorPalette()(weather_dist),
+    )
+)
+```
+
+:::
+
+## 7. Run the App!
+
+## `plotly` and `DT`
+
+::: {style="font-size: 20pt"}
+
+[Interactive web-based data visualization with R, plotly, and shiny](https://plotly-r.com/)
+
+[Scatter Plots on Maps in R](https://plotly.com/r/scatter-plots-on-maps/)
+
+[DT: An R interface to the DataTables library](https://rstudio.github.io/DT/)
 
 :::
 
