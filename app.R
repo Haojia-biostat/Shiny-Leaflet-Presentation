@@ -130,7 +130,7 @@ server <- function(input, output) {
   basemap <- reactive(
     leaflet() |>
       addProviderTiles("CartoDB.Positron") |>
-      fitBounds(-123.4, 18.4, -66.1, 47.8) |>
+      fitBounds(-124.3, 24.5, -68.4, 49) |>
       addLegend("bottomleft", pal = colorPalette(), values = state_data()$weather_dist, title = "Distance score")
   )
   
