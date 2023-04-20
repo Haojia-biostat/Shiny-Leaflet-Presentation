@@ -1,29 +1,182 @@
 ---
-title: "Introduction to Leaflet and Shiny"
-author: "Haojia Li"
+title: "Leaflet + Shiny"
+subtitle: "PHS 7045: Advanced Programming"
+author: "Haojia Li, MS"
 format:
     revealjs:
       embed-resources: true
       slide-number: true
       scrollable: true
-editor: visual
+      smaller: true
 ---
 
-## Quarto
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = T, warning = F, message = F, fig.width = 7, fig.height = 5)
+slides_eval <- TRUE
+```
 
-Quarto enables you to weave together content and executable code into a finished presentation. To learn more about Quarto presentations see <https://quarto.org/docs/presentations/>.
+# Intro
 
-## Bullets
+## Kick off
 
-When you click the **Render** button a document will be generated that includes:
+::: {style="font-size: 20pt"}
 
--   Content authored with markdown
--   Output from executable code
+To wrap our heads around things, let's start by diving into the [COVID-19 tracker app](https://shiny.rstudio.com/gallery/covid19-tracker.html) and getting a feel for what it's all about!
 
-## Code
+:::
 
-When you click the **Render** button a presentation will be generated that includes both content and the output of embedded code. You can embed code like this:
+## Plan for today
+
+::: {style="font-size: 20pt"}
+
+What we'll be using
+
+1. **Leaflet**: "Create Interactive Web Maps with the JavaScript 'Leaflet' Library" ([read more](https://cran.r-project.org/web/packages/leaflet/)).
+
+2. **plotly**: "Create Interactive Web Graphics via 'plotly.js'" ([read more](https://cran.r-project.org/web/packages/plotly/))
+
+3. **DT**: "A Wrapper of the JavaScript Library 'DataTables'" ([read more](https://cran.r-project.org/web/packages/DT/))
+
+4. **shiny**: "Web Application Framework for R" ([read more](https://cran.r-project.org/web/packages/shiny/))
+
+We will adopt the the practice in Part 3, [Lab 3](https://uofuepibio.github.io/PHS7045-advanced-programming/week-03-lab.html), visualizing the representative USAF station(s) for weather conditions.
+
+:::
+
+# Data preparation
+
+## 1. Read-in and data combination
+
+::: {style="font-size: 20pt"}
+
+The met data contains the records of weather conditions, including wind speed, temperature, dew point, atmospheric pressure, and relative humidity, at USAF stations in August 2019.
 
 ```{r}
-1 + 1
+# ---- load data.table package ----
+library(data.table)
+
+# ---- set up weathers ----
+weathers_var <- c("wind.sp", "temp", "dew.point", "atm.press", "rh")
+weathers_label <- c("Wind speed", "Temperature", "Dew point", "Atmospheric pressure", "Relative humidity")
+weathers_unit <- c(" km/h", "&#8451;", "&#8451;", " hPa", "%")
+
+# ---- met data read-in and processing ----
+met <- fread("https://raw.githubusercontent.com/USCbiostats/data-science-data/master/02_met/met_all.gz")
+# select columns
+met <- met[, c("USAFID", "day", "hour", weathers_var), with = F]
+
+# ---- station data read-in and processing ----
+stations <- fread("ftp://ftp.ncdc.noaa.gov/pub/data/noaa/isd-history.csv")
+# filter stations in US and select columns
+stations <- stations[CTRY == "US", .(USAF, `STATION NAME`, STATE, LON, LAT)]
+
+# drop NAs (999999) in USAF
+stations[, USAF := as.integer(USAF)]
+stations[, USAF := fifelse(USAF == 999999, NA_integer_, USAF)]
+stations <- stations[!is.na(USAF)]
+
+# drop NAs in STATE
+stations[, STATE := fifelse(STATE == "", NA_character_, STATE)]
+stations <- stations[!is.na(STATE)]
+
+# keep only one data point for each USAF
+stations[, n := 1:.N, by = .(USAF)]
+stations <- stations[n == 1,][, n := NULL]
+
+# ---- merge station into met ----
+met <- merge(met, stations, by.x = "USAFID", by.y = "USAF", all.x = T)
 ```
+
+:::
+
+## 2. Data aggregation
+
+::: {style="font-size: 20pt"}
+
+We want to calculate the median value of weather conditions at different levels: station, state, and country.
+
+```{r}
+# number of records and median value of weathers at station level
+met_station <- met[, c(.N, lapply(.SD, median, na.rm = T)), 
+                   by = .(USAFID, STATE, `STATION NAME`, LON, LAT),
+                   .SDcols = weathers_var]
+
+# median value of weathers at state level
+met_state <- met[, lapply(.SD, median, na.rm = T), by = STATE,.SDcols = weathers_var]
+# merge state-level median values
+met_station <- merge(met_station, met_state, by = "STATE", suffixes = c(".station", ".state"))
+
+# median value of weathers at country level
+met_us <- met[, lapply(.SD, median, na.rm = T), .SDcols = weathers_var]
+# add country-level median values
+colnames(met_us) <- paste0(colnames(met_us), ".us")
+met_station <- cbind(met_station, met_us)
+
+library(kableExtra)
+kable(met_station, row.names = T) |> kable_styling(font_size = 12) |> scroll_box(width = "100%", height = "150px")
+```
+
+:::
+
+## 3. Identify representative station(s) 
+
+::: {style="font-size: 20pt"}
+
+Write a function to identify the representative station(s), at state or country level,  by euclidean distance. User can specify the weather condition(s) of interest and number and/or percentage of the representative.
+
+```{r}
+sta_represent <- function(
+    weathers = weathers_var, # weather conditions of interest
+    top_n = 3, # number of representative stations
+    top_perc = 10, # upper limit of percentage for representatives
+    level = c("state", "us") # at which level to identify representatives
+) {
+  weathers <- match.arg(weathers, several.ok = T)
+  level <- match.arg(level)
+  
+  fdata <- copy(met_station)
+  
+  # calculate euclidean distance
+  fdata$weather_dist <- sqrt(rowSums(
+    (as.matrix(fdata[, paste0(weathers, ".", "station"), with = F]) - 
+       as.matrix(fdata[, paste0(weathers, ".", level), with = F])) ^ 2,
+  ))
+  
+  # identify the representative station by distance and number of records
+  if(level == "state")
+    res <- fdata[order(weather_dist, -N), head(.SD, min(top_n, ceiling(.N * top_perc/100))), 
+                 by = STATE]
+  if(level == "us")
+    res <- fdata[order(weather_dist, -N), head(.SD, min(top_n, ceiling(.N * top_perc/100)))]
+  
+  # add text to be used as popup
+  res$text <- paste0(
+    "USAFID: ", res$USAFID, "<br>", 
+    "Name: ", res$`STATION NAME`, "<br>",
+    "Number of records: ", res$N, "<br>",
+    sapply(weathers, \(x) {
+      paste0(weathers_label[match(x, weathers_var)], ": ",
+             unlist(res[, paste0(x, ".station"), with = F]) |> round(1),
+             weathers_unit[match(x, weathers_var)], "<br>")
+    }) |> apply(1, paste, collapse = ""),
+    "Distance score: ", round(res$weather_dist, 1)
+  )
+  
+  # drop missing values
+  res <- res[!is.na(weather_dist), ]
+  return(res)
+}
+```
+
+:::
+
+# Leaflet: Create Interactive Web Maps
+
+## 1. Introduction
+
+# Shiny: Web Application Framework for R
+
+
+
+
+
