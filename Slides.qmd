@@ -7,7 +7,6 @@ format:
       embed-resources: true
       slide-number: true
       scrollable: true
-      smaller: true
 ---
 
 ```{r setup, include=FALSE}
@@ -283,10 +282,10 @@ Let's start with considering all the weather conditions at country level.
 # identify the top 5 or top 10% representative stations for all the weather conditions in the US
 all_us5 <- sta_represent(weathers = weathers_var, top_n = 5, level = "us")
 m <- m |> addMarkers(
-    data = all_us5, 
-    lng = ~LON, lat = ~LAT, popup = ~text,
-    group = "All"
-  )
+  data = all_us5, 
+  lng = ~LON, lat = ~LAT, popup = ~text,
+  group = "All"
+)
 m
 ```
 
@@ -443,6 +442,110 @@ Once you open the `app.R` script in your RStudio editor,
 RStudio will recognize the Shiny script and provide a Run App button (at the top of the editor). 
 Either click this button to launch your app or use the keyboard shortcut: 
 Command+Shift+Enter on Mac / Control+Shift+Enter on Windows.
+
+:::
+
+## 3. Build a user interface
+
+::: {style="font-size: 20pt"}
+
+The application layout section in [Shiny Gallery](https://shiny.rstudio.com/gallery/) 
+demonstrates one or more of the functions you can use to organize app UI.
+
+For the weather condition analysis, we are going to create a `bootstrapPage`, 
+which creates a Shiny UI page that loads the CSS and JaveScript for [Bootstrap](https://getbootstrap.com/), 
+with no content in the page body by default.
+
+We add the `leafletOutput()` to print the Leaflet map, and use `absolutePanel()` to include a draggable control panel.
+
+```{r, eval=FALSE}
+ui <- bootstrapPage(
+  tags$style(type = "text/css", "html, body {width:100%; height:100%}"),
+  
+  leafletOutput(outputId = "map", width = "100%", height = "100%"),
+  
+  absolutePanel(
+    fixed = F, draggable = T,
+    top = "5%", left = "5%", right = "auto", bottom = "auto", width = "auto", height = "auto",
+    ...
+  )
+)
+```
+
+:::
+
+## 4. Add control widgets - `checkboxGroupButtons`
+
+::: {style="font-size: 20pt"}
+
+[Shiny Widgets Gallery](https://shiny.rstudio.com/gallery/widget-gallery.html) displays the basic control widgets in shiny.
+
+Furthermore, [`shinyWidgets`](https://shinyapps.dreamrs.fr/shinyWidgets/) provides custom widgets and other components to enhance your shiny applications.
+
+For the control panel, we are going to include:
+
+1. `checkboxGroupButtons` for the weather conditions;
+
+```{r, eval=FALSE}
+# load shinyWidgets
+if(!require("shinyWidgets", quietly = TRUE)) install.packages("shiny")
+library(shinyWidgets)
+
+# add multiple check box for weather conditions
+checkboxGroupButtons(
+  inputId = "weathers", label = "Weather conditions", choices = weathers_label, selected = weathers_label, 
+)
+```  
+
+:::
+
+## 4. Add control widgets - `numericInput`
+
+::: {style="font-size: 20pt"}
+
+2. `numericInput`s for number and percentage of representative, at country level or state level;
+
+```{r, eval=FALSE}
+# input the number and percentage of the representatives at country level
+fluidRow(
+  column(3, numericInput(
+    inputId = "us_n", label = "Country-N", value = 5, min = 1, max = 15, step = 1, width = "80%"
+  )),
+  column(3, numericInput(
+    inputId = "us_perc", label = "Country-%", value = 10, min = 2, max = 100, step = 2, width = "80%"
+  )),
+  # input the number and percentage of the representatives at state level
+  column(3, numericInput(
+    inputId = "state_n", label = "State-N", value = 10, min = 1, max = 15, step = 1, width = "80%"
+  )),
+  column(3, numericInput(
+    inputId = "state_perc", label = "State-%", value = 10, min = 2, max = 100, step = 2, width = "80%"
+  ))
+)
+```
+
+:::
+
+## 4. Add control widgets - `sliderInput`
+
+::: {style="font-size: 20pt"}
+
+3. `sliderInput` for hours from 0 to 23;
+
+4. `sliderInput` for day from 1 to 31, with animation control;
+
+```{r, eval=FALSE}
+fluidRow(
+  # slider of hours
+  column(6, sliderInput(
+    inputId = "hours", label = "Hour", min = 0, max = 23, value = c(0, 23), step = 1
+  )),
+  # slider of day with animation
+  column(6, sliderInput(
+    inputId = "day", label = "August", min = 1, max = 31, value = 1, step = 1, animate = T
+  ))
+)
+```
 
 :::
 
