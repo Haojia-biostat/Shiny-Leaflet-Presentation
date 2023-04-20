@@ -172,7 +172,35 @@ sta_represent <- function(
 
 # Leaflet: Create Interactive Web Maps
 
-## 1. Introduction
+## 1. Overview
+
+::: {style="font-size: 20pt"}
+
+[Leaflet](https://leafletjs.com/) is one of the most popular open-source JavaScript libraries for interactive maps.
+
+The [`leaflet`](https://rstudio.github.io/leaflet/) R package makes it easy to integrate and control Leaflet maps in R.
+
+You can use this package at the R console, within R Markdown documents, and within Shiny applications.
+
+```{r}
+# load leaflet
+if(!require("leaflet", quietly = TRUE)) install.packages("leaflet")
+library(leaflet)
+```
+
+There are several forms of spatial data which can be processed by leaflet. We will only focus on data frame with lng/lat columns from base R.
+
+The essential steps to build a Leaflet map include: 
+
+1. Create a map widget by calling `leaflet()`;
+
+2. Set up basemaps by `addTiles()` or `addProviderTiles()`;
+
+3. Add components, such as `addMarkers()`, `addCircles()`, and `addLayersControl()`;
+
+4. Print the map widget to display it.
+
+:::
 
 # Shiny: Web Application Framework for R
 
