@@ -11,7 +11,7 @@ format:
 ---
 
 ```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = T, warning = F, message = F, fig.width = 7, fig.height = 5)
+knitr::opts_chunk$set(echo = T, warning = F, message = F)
 slides_eval <- TRUE
 ```
 
@@ -172,7 +172,7 @@ sta_represent <- function(
 
 # Leaflet: Create Interactive Web Maps
 
-## 1. Overview
+## 0. Overview
 
 ::: {style="font-size: 20pt"}
 
@@ -196,9 +196,63 @@ The essential steps to build a Leaflet map include:
 
 2. Set up basemaps by `addTiles()` or `addProviderTiles()`;
 
+3. Manipulate the attributes of the map widget using methods such as `setView()`;
+
 3. Add components, such as `addMarkers()`, `addCircles()`, and `addLayersControl()`;
 
 4. Print the map widget to display it.
+
+:::
+
+## 1. Create a map widget
+
+::: {style="font-size: 20pt"}
+
+We can create a map widget by simply calling `leaflet()`.
+
+```{r out.width="100%"}
+m <- leaflet()
+m
+```
+
+:::
+
+## 2. Set up basemaps by `addTiles()`
+
+::: {style="font-size: 20pt"}
+
+The easiest way to add tiles is by calling `addTiles()` with no arguments; by default, [OpenStreetMap](https://www.openstreetmap.org/#map=2/13.2/-113.3) tiles are used.
+
+```{r, out.width="100%", out.height="400px"}
+m |> addTiles()
+```
+
+:::
+
+## 2. Set up basemaps by `addProviderTiles()`
+
+::: {style="font-size: 20pt"}
+
+Alternatively, many popular free third-party basemaps can be added using the `addProviderTiles()` function, which is implemented using the leaflet-providers plugin. See [here](http://leaflet-extras.github.io/leaflet-providers/preview/index.html) for the complete set. You can use `names(providers)` to view all of the options.
+
+```{r, out.width="100%", out.height="400px"}
+m <- leaflet() |> addProviderTiles(providers$CartoDB.Positron)
+m
+```
+
+:::
+
+## 3. Map methods
+
+::: {style="font-size: 20pt"}
+
+- `setView()` sets the center of the map view and the zoom level;
+- `fitBounds()` fits the view into the rectangle [lng1, lat1] – [lng2, lat2];
+- `clearBounds()` clears the bound, so that the view will be automatically determined by the range of latitude/longitude data in the map layers if provided.
+
+```{r, out.width="100%", out.height="400px"}
+m |> setView(lng = -111.8272, lat = 40.7648, zoom = 17)
+```
 
 :::
 
